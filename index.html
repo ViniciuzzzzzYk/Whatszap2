@@ -2,118 +2,153 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <title>Whatszap 2 - Cassino</title>
+    <title>Whatszap 2 - VIP Edition</title>
     <script src="https://cdn.ably.com/lib/ably.min-1.js"></script>
-    <style>
-        * { box-sizing: border-box; }
-        body { background: #0b141a; color: #e9edef; font-family: 'Segoe UI', sans-serif; margin: 0; display: flex; height: 100vh; overflow: hidden; }
-        
-        /* Chat Area */
-        #chat-side { width: 65%; display: flex; flex-direction: column; border-right: 1px solid #3b4a54; }
-        #header { background: #202c33; padding: 15px; font-weight: bold; color: #00a884; display: flex; justify-content: space-between; }
-        #messages { flex: 1; overflow-y: auto; padding: 20px; background-color: #0b141a; background-image: url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png'); background-blend-mode: overlay; }
-        .msg { background: #202c33; padding: 8px 12px; border-radius: 8px; margin-bottom: 8px; max-width: 70%; border: 1px solid #2a3942; }
-        .msg b { color: #ff3333; font-size: 0.8em; display: block; }
-        
-        /* Cassino Area */
-        #casino-side { width: 35%; background: #111b21; padding: 20px; display: flex; flex-direction: column; align-items: center; border-left: 1px solid #3b4a54; }
-        .card { background: #202c33; border-radius: 12px; padding: 20px; width: 100%; margin-bottom: 20px; text-align: center; border: 1px solid #00a884; }
-        .coins { font-size: 35px; color: #ffd700; font-weight: bold; }
-        .slots { font-size: 50px; background: #000; padding: 15px; border-radius: 10px; margin: 20px 0; border: 2px solid #ff3333; }
-        
-        /* Inputs */
-        #input-area { background: #202c33; padding: 15px; display: flex; gap: 10px; }
-        input { flex: 1; background: #2a3942; border: none; padding: 12px; border-radius: 8px; color: #fff; outline: none; }
-        button { background: #00a884; border: none; padding: 10px 20px; border-radius: 8px; color: #fff; cursor: pointer; font-weight: bold; }
-        .btn-spin { background: #ff3333; width: 100%; padding: 15px; font-size: 1.2em; }
-    </style>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-    <div id="chat-side">
-        <div id="header">
-            <span>Whatszap 2</span>
-            <small id="my-name"></small>
-        </div>
-        <div id="messages"></div>
-        <div id="input-area">
-            <input type="text" id="msgInput" placeholder="Mensagem...">
-            <button onclick="send()">></button>
+    <div id="name-overlay">
+        <div class="card">
+            <h3>Escolha seu Nome</h3>
+            <input type="text" id="name-input" placeholder="Ex: Zhyr_Rei">
+            <button onclick="saveName()">Entrar no Chat</button>
         </div>
     </div>
 
-    <div id="casino-side">
-        <div class="card">
-            <div>SUAS MOEDAS</div>
-            <div class="coins">🪙 <span id="coin-count">100</span></div>
+    <div id="app">
+        <div id="chat-side">
+            <div id="header">
+                <div class="user-info">
+                    <div class="status-dot"></div>
+                    <span id="display-name">Carregando...</span>
+                </div>
+                <div class="logo">Whatszap 2</div>
+            </div>
+            
+            <div id="messages"></div>
+            
+            <div id="giphy-bar" class="hidden">
+                <input type="text" id="gif-search" placeholder="Procurar figurinha..." oninput="searchGiphy()">
+                <div id="gif-results"></div>
+            </div>
+
+            <div id="input-area">
+                <button class="btn-tool" onclick="toggleGiphy()">🖼️</button>
+                <input type="text" id="msgInput" placeholder="Digite uma mensagem...">
+                <button onclick="send()">ENVIAR</button>
+            </div>
         </div>
 
-        <div class="card" style="border-color: #ff3333;">
-            <h3>CASSINO ZHYR</h3>
-            <div class="slots" id="slot-res">🎰|🎰|🎰</div>
-            <button class="btn-spin" onclick="spin()">GIRAR (10 🪙)</button>
+        <div id="casino-side">
+            <div class="card gold">
+                <div class="label">SALDO DISPONÍVEL</div>
+                <div class="coins">🪙 <span id="coin-count">100</span></div>
+            </div>
+
+            <div class="card casino">
+                <div class="casino-header">CASSINO ZHYR</div>
+                <div class="slots" id="slot-res">🎰|🎰|🎰</div>
+                <button class="btn-spin" onclick="spin()">GIRAR (10 🪙)</button>
+            </div>
+
+            <div id="log-system">
+                <h4>Atividade Recente</h4>
+                <div id="activity-log"></div>
+            </div>
         </div>
     </div>
 
     <script>
-        // Configuração do Chat (Substitua pela sua chave do Ably se o limite estourar)
         const ably = new Ably.Realtime('bQ9mYw.fE6QZw:Lbp86_Il-Q27JQ--_kukJ9SLo7cSSYHZHmUuBWULQ28'); 
-        const channel = ably.channels.get('global-chat');
-        
-        // Gerar nome temporário
-        const userAlias = "User_" + Math.floor(Math.random() * 999);
-        document.getElementById('my-name').innerText = userAlias;
+        const channel = ably.channels.get('global-v2');
+        const GIPHY_KEY = 'RWb8HVX8wdNamlAMXr66P5XReYEtBRa5'; // Pegue em developers.giphy.com
 
-        // Sistema de Moedas (LocalStorage - Salva no navegador)
+        let userName = localStorage.getItem('username') || "";
         let coins = parseInt(localStorage.getItem('coins')) || 100;
-        updateUI();
+
+        if(userName) {
+            document.getElementById('name-overlay').style.display = 'none';
+            document.getElementById('display-name').innerText = userName;
+        }
+
+        function saveName() {
+            const val = document.getElementById('name-input').value;
+            if(val.length > 2) {
+                userName = val;
+                localStorage.setItem('username', val);
+                document.getElementById('name-overlay').style.display = 'none';
+                document.getElementById('display-name').innerText = val;
+            }
+        }
 
         function updateUI() {
             document.getElementById('coin-count').innerText = coins;
             localStorage.setItem('coins', coins);
         }
 
-        // Receber Mensagens
+        // Receber Mensagens e Alertas de Jackpot
         channel.subscribe('msg', (m) => {
             const box = document.getElementById('messages');
-            box.innerHTML += `<div class="msg"><b>${m.data.user}</b>${m.data.text}</div>`;
+            let content = "";
+
+            if(m.data.type === 'gif') {
+                content = `<img src="${m.data.text}" class="gif-msg">`;
+            } else if(m.data.type === 'jackpot') {
+                content = `<div class="jackpot-alert">🔥 OPA! ${m.data.user} ACABOU DE GANHAR UM JACKPOT! 🔥</div>`;
+            } else {
+                content = m.data.text;
+            }
+
+            box.innerHTML += `
+                <div class="msg-container ${m.data.user === userName ? 'me' : ''}">
+                    <div class="msg">
+                        <b>${m.data.user}</b>
+                        ${content}
+                    </div>
+                </div>`;
             box.scrollTop = box.scrollHeight;
         });
 
-        // Enviar Mensagem
-        function send() {
+        function send(text = null, type = 'text') {
             const input = document.getElementById('msgInput');
-            if(!input.value) return;
-            channel.publish('msg', { user: userAlias, text: input.value });
+            const val = text || input.value;
+            if(!val) return;
+            channel.publish('msg', { user: userName, text: val, type: type });
             input.value = '';
+            if(type === 'gif') toggleGiphy();
         }
 
-        // Sistema de Cassino
+        // GIPHY SYSTEM
+        function toggleGiphy() { document.getElementById('giphy-bar').classList.toggle('hidden'); }
+
+        async function searchGiphy() {
+            const q = document.getElementById('gif-search').value;
+            if(q.length < 3) return;
+            const res = await fetch(`https://api.giphy.com/v1/gifs/search?api_key=${GIPHY_KEY}&q=${q}&limit=6`);
+            const data = await res.json();
+            const results = document.getElementById('gif-results');
+            results.innerHTML = data.data.map(g => `<img src="${g.images.fixed_height_small.url}" onclick="send('${g.images.fixed_height.url}', 'gif')">`).join('');
+        }
+
+        // CASSINO
         function spin() {
-            if(coins < 10) return alert("Acabou o dinheiro!");
-            
+            if(coins < 10) return;
             coins -= 10;
             const icons = ['💎', '🍎', '🍀', '🔥', '7️⃣'];
-            const a = icons[Math.floor(Math.random()*icons.length)];
-            const b = icons[Math.floor(Math.random()*icons.length)];
-            const c = icons[Math.floor(Math.random()*icons.length)];
-            
+            const a = icons[Math.floor(Math.random()*5)], b = icons[Math.floor(Math.random()*5)], c = icons[Math.floor(Math.random()*5)];
             document.getElementById('slot-res').innerText = `${a}|${b}|${c}`;
             
             if(a === b && b === c) {
-                alert("JACKPOT! +200");
-                coins += 200;
+                coins += 500;
+                channel.publish('msg', { user: userName, type: 'jackpot' });
             } else if(a === b || b === c || a === c) {
-                coins += 20;
+                coins += 30;
             }
-            
             updateUI();
         }
 
-        // Enter para enviar
-        document.getElementById('msgInput').addEventListener('keypress', (e) => {
-            if(e.key === 'Enter') send();
-        });
+        updateUI();
     </script>
 </body>
 </html>
